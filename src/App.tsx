@@ -1,11 +1,12 @@
 import { useState } from "react";
 import Calculator from "./tools/Calculator";
+import UnitConverter from "./tools/UnitConverter";
 import "./App.css";
 
-type ActiveTool = "calculator";
+type ActiveTool = "calculator" | "converter";
 
 function App() {
-  const [activeTool] = useState<ActiveTool>("calculator");
+  const [activeTool, setActiveTool] = useState<ActiveTool>("calculator");
 
   return (
     <div className="app-layout">
@@ -34,6 +35,7 @@ function App() {
         <nav className="tools-nav" aria-label="Tool selection">
           <button
             className={`tool-tab-btn ${activeTool === "calculator" ? "active" : ""}`}
+            onClick={() => setActiveTool("calculator")}
             type="button"
             aria-current={activeTool === "calculator" ? "page" : undefined}
           >
@@ -60,6 +62,29 @@ function App() {
             </svg>
             Calculator
           </button>
+
+          <button
+            className={`tool-tab-btn ${activeTool === "converter" ? "active" : ""}`}
+            onClick={() => setActiveTool("converter")}
+            type="button"
+            aria-current={activeTool === "converter" ? "page" : undefined}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m7 16-4-4 4-4" />
+              <path d="M3 12h18" />
+              <path d="m17 8 4 4-4 4" />
+            </svg>
+            Unit Converter
+          </button>
         </nav>
 
         {/* Status / Quick Info */}
@@ -71,6 +96,7 @@ function App() {
       {/* Main Tool View */}
       <main className="app-main">
         {activeTool === "calculator" && <Calculator />}
+        {activeTool === "converter" && <UnitConverter />}
       </main>
     </div>
   );
