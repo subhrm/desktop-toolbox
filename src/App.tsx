@@ -1,12 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Calculator from "./tools/Calculator";
 import UnitConverter from "./tools/UnitConverter";
+import SettingsModal, { ThemeMode } from "./components/SettingsModal/SettingsModal";
 import "./App.css";
 
 type ActiveTool = "calculator" | "converter";
 
 function App() {
   const [activeTool, setActiveTool] = useState<ActiveTool>("calculator");
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    const saved = localStorage.getItem("desktop-toolbox:theme");
+    return (saved as ThemeMode) || "system";
+  });
+  const [effectiveTheme, setEffectiveTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const updateTheme = () => {
+      let active: "light" | "dark" = "light";
+      if (theme === "system") {
+        const isDark =
+          typeof window !== "undefined" &&
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches;
+        active = isDark ? "dark" : "light";
+      } else {
+        active = theme;
+      }
+      setEffectiveTheme(active);
+      document.documentElement.setAttribute("data-theme", active);
+    };
+
+    updateTheme();
+
+    if (theme === "system" && typeof window !== "undefined" && window.matchMedia) {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => updateTheme();
+      mediaQuery.addEventListener("change", handler);
+      return () => mediaQuery.removeEventListener("change", handler);
+    }
+  }, [theme]);
+
+  const handleThemeChange = (newTheme: ThemeMode) => {
+    setTheme(newTheme);
+    localStorage.setItem("desktop-toolbox:theme", newTheme);
+  };
 
   return (
     <div className="app-layout">
@@ -87,9 +125,35 @@ function App() {
           </button>
         </nav>
 
-        {/* Status / Quick Info */}
-        <div className="header-status">
-          <span>Offline Ready</span>
+        {/* Status & Settings Header Actions */}
+        <div className="header-actions">
+          <div className="header-status">
+            <span className="status-indicator-live" aria-hidden="true" />
+            <span>Offline Ready</span>
+          </div>
+
+          <button
+            className="settings-trigger-btn"
+            onClick={() => setIsSettingsOpen(true)}
+            type="button"
+            title="Open Settings"
+            aria-label="Settings"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span>Settings</span>
+          </button>
         </div>
       </header>
 
@@ -98,6 +162,15 @@ function App() {
         {activeTool === "calculator" && <Calculator />}
         {activeTool === "converter" && <UnitConverter />}
       </main>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        theme={theme}
+        onThemeChange={handleThemeChange}
+        effectiveTheme={effectiveTheme}
+      />
     </div>
   );
 }

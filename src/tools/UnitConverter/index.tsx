@@ -7,6 +7,7 @@ import {
   ConversionResult,
   AllConversionsResult,
 } from "../../services/unitConverterService";
+import CategoryPattern from "./CategoryPattern";
 import "./unitConverter.css";
 
 // SVG Category Icons helper
@@ -223,44 +224,72 @@ export const UnitConverter: React.FC = () => {
   const presets = CATEGORY_PRESETS[activeCategoryId] || [1, 5, 10, 50, 100];
 
   return (
-    <div className="converter-layout">
-      {/* Left Sidebar: Categories Navigation */}
-      <aside className="converter-sidebar" aria-label="Unit categories">
-        <div className="converter-sidebar-header">
-          <span className="sidebar-section-title">Categories</span>
-          <span className="sidebar-count">{categories.length}</span>
-        </div>
-        <nav className="converter-category-list" role="tablist" aria-label="Conversion categories">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              className={`converter-category-item ${cat.id === activeCategoryId ? "active" : ""}`}
-              onClick={() => handleSelectCategory(cat)}
-              role="tab"
-              aria-selected={cat.id === activeCategoryId}
-              type="button"
-            >
-              <span className="category-icon">
-                <CategoryIcon icon={cat.icon} />
-              </span>
-              <span className="category-name">{cat.name}</span>
-            </button>
-          ))}
-        </nav>
-      </aside>
+    <div className="converter-page-container">
+      {/* Full-Page Category Background Geometric Pattern */}
+      <CategoryPattern
+        categoryId={activeCategoryId}
+        idPrefix="page"
+        className="converter-page-pattern"
+      />
 
-      {/* Right Column: Main Converter Workspace */}
-      <div className="converter-main-workspace">
-        {/* Error Banner */}
-        {error && (
-          <div className="converter-error" role="alert">
-            <span>{error}</span>
+      <div className="converter-layout">
+        {/* Left Sidebar: Categories Navigation */}
+        <aside className="converter-sidebar" aria-label="Unit categories">
+          <div className="converter-sidebar-header">
+            <span className="sidebar-section-title">Categories</span>
+            <span className="sidebar-count">{categories.length}</span>
           </div>
-        )}
+          <nav className="converter-category-list" role="tablist" aria-label="Conversion categories">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                className={`converter-category-item ${cat.id === activeCategoryId ? "active" : ""}`}
+                onClick={() => handleSelectCategory(cat)}
+                role="tab"
+                aria-selected={cat.id === activeCategoryId}
+                type="button"
+              >
+                <span className="category-icon">
+                  <CategoryIcon icon={cat.icon} />
+                </span>
+                <span className="category-name">{cat.name}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
 
-        {/* Main Conversion Card */}
-        <div className="converter-main-card">
-        {showCopiedToast && <div className="copy-toast">Copied to clipboard!</div>}
+        {/* Right Column: Main Converter Workspace */}
+        <div className="converter-main-workspace">
+          {/* Error Banner */}
+          {error && (
+            <div className="converter-error" role="alert">
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Main Conversion Card */}
+          <div className="converter-main-card">
+            {/* Category Background Geometric Pattern inside card */}
+            <CategoryPattern
+              categoryId={activeCategoryId}
+              idPrefix="card"
+              className="converter-card-pattern"
+            />
+
+          {/* Card Header Category Badge */}
+          <div className="converter-card-header">
+            <div className="category-badge-chip">
+              <span className="category-badge-icon">
+                <CategoryIcon icon={activeCategory?.icon || "grid"} />
+              </span>
+              <span className="category-badge-title">{activeCategory?.name}</span>
+            </div>
+            <span className="category-units-count">
+              {activeCategory?.units.length || 0} units
+            </span>
+          </div>
+
+          {showCopiedToast && <div className="copy-toast">Copied to clipboard!</div>}
 
         <div className="conversion-panels-row">
           {/* FROM Panel */}
@@ -418,6 +447,7 @@ export const UnitConverter: React.FC = () => {
         </div>
       </section>
       </div>
+    </div>
     </div>
   );
 };

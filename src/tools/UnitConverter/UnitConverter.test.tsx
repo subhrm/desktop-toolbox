@@ -121,7 +121,7 @@ describe("UnitConverter Component", () => {
     render(<UnitConverter />);
 
     await waitFor(() => {
-      expect(screen.getByText("Distance & Length")).toBeTruthy();
+      expect(screen.getAllByText("Distance & Length").length).toBeGreaterThan(0);
       expect(screen.getByText("Temperature")).toBeTruthy();
       expect(screen.getByText("Area")).toBeTruthy();
     });
@@ -145,6 +145,23 @@ describe("UnitConverter Component", () => {
         "f",
         25
       );
+    });
+  });
+
+  it("renders both page-level and card-level geometric background patterns for active category", async () => {
+    render(<UnitConverter />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("category-pattern-page-distance")).toBeTruthy();
+      expect(screen.getByTestId("category-pattern-card-distance")).toBeTruthy();
+    });
+
+    // Switch to temperature and verify page and card patterns update
+    fireEvent.click(screen.getByText("Temperature"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("category-pattern-page-temperature")).toBeTruthy();
+      expect(screen.getByTestId("category-pattern-card-temperature")).toBeTruthy();
     });
   });
 
