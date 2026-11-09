@@ -1035,5 +1035,127 @@ mod tests {
         assert_eq!(res.conversions.len(), LENGTH_UNITS.len());
         let km_row = res.conversions.iter().find(|r| r.unit_id == "km").unwrap();
         assert_eq!(km_row.value, 1.0);
+
+        // Convert all for temperature
+        let temp_res = convert_all("temperature", "c", 100.0).unwrap();
+        assert_eq!(temp_res.conversions.len(), TEMPERATURE_UNITS.len());
+        let f_row = temp_res.conversions.iter().find(|r| r.unit_id == "f").unwrap();
+        assert_eq!(f_row.value, 212.0);
+    }
+
+    #[test]
+    fn test_all_categories_conversions() {
+        // Volume: 1 L = 1000 mL
+        let res_vol = convert("volume", "l", "ml", 1.0).unwrap();
+        assert_eq!(res_vol.to_value, 1000.0);
+        let res_gal = convert("volume", "gal_us", "l", 1.0).unwrap();
+        assert!((res_gal.to_value - 3.785411784).abs() < 1e-6);
+
+        // Mass: 1 kg = 1000 g, 1 lb to oz
+        let res_mass = convert("mass", "kg", "g", 1.0).unwrap();
+        assert_eq!(res_mass.to_value, 1000.0);
+        let res_lb = convert("mass", "lb", "oz", 1.0).unwrap();
+        assert!((res_lb.to_value - 16.0).abs() < 1e-6);
+
+        // Speed: 100 kph to mph, mps to kph
+        let res_spd = convert("speed", "kph", "mps", 36.0).unwrap();
+        assert_eq!(res_spd.to_value, 10.0);
+        let res_mph = convert("speed", "mph", "kph", 60.0).unwrap();
+        assert!((res_mph.to_value - 96.56064).abs() < 1e-4);
+
+        // Time: 1 day = 24 hours, 1 hour = 60 minutes
+        let res_time = convert("time", "d", "h", 1.0).unwrap();
+        assert_eq!(res_time.to_value, 24.0);
+        let res_min = convert("time", "h", "min", 2.0).unwrap();
+        assert_eq!(res_min.to_value, 120.0);
+
+        // Pressure: 1 bar to kpa, 1 atm to psi
+        let res_press = convert("pressure", "bar", "kpa", 1.0).unwrap();
+        assert_eq!(res_press.to_value, 100.0);
+        let res_atm = convert("pressure", "atm", "psi", 1.0).unwrap();
+        assert!((res_atm.to_value - 14.6959487755).abs() < 1e-4);
+
+        // Energy: 1 kcal = 4.184 kJ, 1 kWh to J
+        let res_energy = convert("energy", "kcal", "kj", 1.0).unwrap();
+        assert_eq!(res_energy.to_value, 4.184);
+        let res_kwh = convert("energy", "kwh", "j", 1.0).unwrap();
+        assert_eq!(res_kwh.to_value, 3_600_000.0);
+
+        // Ratio 1:1 formula
+        let res_same = convert("distance", "m", "m", 5.0).unwrap();
+        assert_eq!(res_same.formula, "1 : 1");
+    }
+
+    #[test]
+    fn test_temperature_exhaustive_matrix() {
+        // From Kelvin
+        let k_to_c = convert("temperature", "k", "c", 300.0).unwrap();
+        assert!((k_to_c.to_value - 26.85).abs() < 1e-10);
+        let k_to_f = convert("temperature", "k", "f", 300.0).unwrap();
+        assert!((k_to_f.to_value - 80.33).abs() < 1e-2);
+        let k_to_k = convert("temperature", "k", "k", 300.0).unwrap();
+        assert_eq!(k_to_k.to_value, 300.0);
+        let k_to_r = convert("temperature", "k", "r", 300.0).unwrap();
+        assert!((k_to_r.to_value - 540.0).abs() < 1e-2);
+
+        // From Rankine
+        let r_to_c = convert("temperature", "r", "c", 491.67).unwrap();
+        assert!(r_to_c.to_value.abs() < 1e-5);
+        let r_to_f = convert("temperature", "r", "f", 491.67).unwrap();
+        assert!((r_to_f.to_value - 32.0).abs() < 1e-5);
+        let r_to_k = convert("temperature", "r", "k", 491.67).unwrap();
+        assert!((r_to_k.to_value - 273.15).abs() < 1e-5);
+        let r_to_r = convert("temperature", "r", "r", 491.67).unwrap();
+        assert!((r_to_r.to_value - 491.67).abs() < 1e-4);
+
+        // From Celsius to C and R
+        let c_to_c = convert("temperature", "c", "c", 25.0).unwrap();
+        assert_eq!(c_to_c.to_value, 25.0);
+        let c_to_r = convert("temperature", "c", "r", 0.0).unwrap();
+        assert!((c_to_r.to_value - 491.67).abs() < 1e-2);
+
+        // From Fahrenheit to F and R
+        let f_to_f = convert("temperature", "f", "f", 72.0).unwrap();
+        assert_eq!(f_to_f.to_value, 72.0);
+        let f_to_r = convert("temperature", "f", "r", 32.0).unwrap();
+        assert!((f_to_r.to_value - 491.67).abs() < 1e-2);
+
+        // Errors
+        assert!(convert("temperature", "unknown", "c", 10.0).is_err());
+        assert!(convert("temperature", "c", "unknown", 10.0).is_err());
+    }
+
+    #[test]
+    fn test_unit_converter_errors_and_edge_cases() {
+        assert!(convert("nonexistent", "m", "ft", 1.0).is_err());
+        assert!(convert("distance", "unknown_from", "ft", 1.0).is_err());
+        assert!(convert("distance", "m", "unknown_to", 1.0).is_err());
+        assert!(convert_all("nonexistent", "m", 1.0).is_err());
+        assert!(convert_all("distance", "unknown_from", 1.0).is_err());
+    }
+
+    #[test]
+    fn test_format_converted_number_edge_cases() {
+        assert_eq!(format_converted_number(f64::NAN), "NaN");
+        assert_eq!(format_converted_number(f64::INFINITY), "Infinity");
+        assert_eq!(format_converted_number(f64::NEG_INFINITY), "-Infinity");
+        assert_eq!(format_converted_number(0.0), "0");
+        assert_eq!(format_converted_number(1e-16), "0");
+        assert!(format_converted_number(1e13).contains('e'));
+        assert!(format_converted_number(1e-6).contains('e'));
+        assert_eq!(format_converted_number(12.5), "12.5");
+        assert_eq!(format_converted_number(100.0), "100");
+    }
+
+    #[test]
+    fn test_tauri_command_handlers() {
+        let cats = get_unit_categories();
+        assert_eq!(cats.len(), 10);
+
+        let res = convert_units("distance".into(), "km".into(), "m".into(), 2.0).unwrap();
+        assert_eq!(res.to_value, 2000.0);
+
+        let all_res = convert_to_all_units("mass".into(), "kg".into(), 5.0).unwrap();
+        assert_eq!(all_res.conversions.len(), MASS_UNITS.len());
     }
 }

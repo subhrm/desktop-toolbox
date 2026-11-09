@@ -207,6 +207,7 @@ export const Calculator: React.FC = () => {
   const handleAppend = (token: string, isFunction = false) => {
     clearError();
     if (justEvaluated) {
+      setPreviousExpr("");
       if (["+", "-", "×", "÷", "*", "/", "^", "%"].includes(token)) {
         setExpression(displayValue + " " + token + " ");
         setDisplayValue(displayValue + " " + token + " ");
@@ -239,6 +240,7 @@ export const Calculator: React.FC = () => {
     if (justEvaluated) {
       setExpression(digit);
       setDisplayValue(digit);
+      setPreviousExpr("");
       setJustEvaluated(false);
       return;
     }
@@ -258,6 +260,7 @@ export const Calculator: React.FC = () => {
     if (justEvaluated) {
       setExpression("0.");
       setDisplayValue("0.");
+      setPreviousExpr("");
       setJustEvaluated(false);
       return;
     }
@@ -284,6 +287,7 @@ export const Calculator: React.FC = () => {
     if (justEvaluated) {
       setExpression(displayValue + formattedOp);
       setDisplayValue(displayValue + formattedOp);
+      setPreviousExpr("");
       setJustEvaluated(false);
       return;
     }
@@ -314,6 +318,7 @@ export const Calculator: React.FC = () => {
   const handleClear = () => {
     setExpression("");
     setDisplayValue("0");
+    setPreviousExpr("");
     setError(null);
     setJustEvaluated(false);
   };

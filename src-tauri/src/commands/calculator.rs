@@ -930,5 +930,214 @@ mod tests {
         assert!(evaluate("ln(-5)", AngleUnit::Deg).is_err());
         assert!(evaluate("asin(2)", AngleUnit::Deg).is_err());
         assert!(evaluate("(-2)^0.5", AngleUnit::Deg).is_err());
+        assert!(evaluate("", AngleUnit::Deg).is_err());
+        assert!(evaluate("   ", AngleUnit::Deg).is_err());
+        assert!(evaluate("5 % 0", AngleUnit::Deg).is_err());
+        assert!(evaluate("0 ^ 0", AngleUnit::Deg).is_err());
+        assert!(evaluate("0 ^ (-2)", AngleUnit::Deg).is_err());
+        assert!(evaluate("acos(2.0)", AngleUnit::Deg).is_err());
+        assert!(evaluate("acosh(0.5)", AngleUnit::Deg).is_err());
+        assert!(evaluate("atanh(1.0)", AngleUnit::Deg).is_err());
+        assert!(evaluate("atanh(-2.0)", AngleUnit::Deg).is_err());
+        assert!(evaluate("tan(90)", AngleUnit::Deg).is_err());
+        assert!(evaluate("tan(270)", AngleUnit::Deg).is_err());
+        assert!(evaluate("root(16, 0)", AngleUnit::Deg).is_err());
+        assert!(evaluate("root(-16, 2)", AngleUnit::Deg).is_err());
+        assert!(evaluate("log10(0)", AngleUnit::Deg).is_err());
+        assert!(evaluate("log2(-4)", AngleUnit::Deg).is_err());
+        assert!(evaluate("inv(0)", AngleUnit::Deg).is_err());
+        assert!(evaluate("fact(-3)", AngleUnit::Deg).is_err());
+        assert!(evaluate("fact(2.5)", AngleUnit::Deg).is_err());
+        assert!(evaluate("fact(200)", AngleUnit::Deg).is_err());
+        assert!(evaluate("(2 + 3", AngleUnit::Deg).is_err());
+        assert!(evaluate("sqrt 4", AngleUnit::Deg).is_err());
+        assert!(evaluate("1.2.3 + 4", AngleUnit::Deg).is_err());
+        assert!(evaluate("5 @ 3", AngleUnit::Deg).is_err());
+        assert!(evaluate("2 + 3 4", AngleUnit::Deg).is_err());
+        assert!(evaluate("unknown_fn(5)", AngleUnit::Deg).is_err());
+        assert!(evaluate("pow(2)", AngleUnit::Deg).is_err());
+    }
+
+    #[test]
+    fn test_additional_functions_and_syntax() {
+        // Unicode tokens & special syntax
+        let res_sq = evaluate("5²", AngleUnit::Deg).unwrap();
+        assert_eq!(res_sq.result, 25.0);
+        let res_cube = evaluate("2³", AngleUnit::Deg).unwrap();
+        assert_eq!(res_cube.result, 8.0);
+        let res_sqrt_sym = evaluate("√(16)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_sqrt_sym.result, 4.0);
+        let res_cbrt_sym = evaluate("∛(27)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_cbrt_sym.result, 3.0);
+        let res_pi_sym = evaluate("π * 2", AngleUnit::Deg).unwrap();
+        assert!((res_pi_sym.result - PI * 2.0).abs() < 1e-12);
+
+        // Constants: e, tau, phi
+        let res_tau = evaluate("tau", AngleUnit::Deg).unwrap();
+        assert!((res_tau.result - PI * 2.0).abs() < 1e-12);
+        let res_phi = evaluate("phi", AngleUnit::Deg).unwrap();
+        assert!((res_phi.result - 1.618033988749895).abs() < 1e-10);
+
+        // Negative numbers, unary plus/minus, signs
+        let res_neg = evaluate("-(-5) + +10 − 3 · 2 ÷ 2", AngleUnit::Deg).unwrap();
+        assert_eq!(res_neg.result, 12.0);
+
+        // Scientific notation in tokenizer
+        let res_sci = evaluate("1.5e3 + 2.5e-1", AngleUnit::Deg).unwrap();
+        assert_eq!(res_sci.result, 1500.25);
+
+        // Functions: floor, ceil, round, abs, exp, log2, root with odd negative
+        let res_fl = evaluate("floor(3.8)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_fl.result, 3.0);
+        let res_ce = evaluate("ceil(3.2)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_ce.result, 4.0);
+        let res_rd = evaluate("round(3.5)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_rd.result, 4.0);
+        let res_abs = evaluate("abs(-42)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_abs.result, 42.0);
+        let res_exp = evaluate("exp(2)", AngleUnit::Deg).unwrap();
+        assert!((res_exp.result - E.powi(2)).abs() < 1e-10);
+        let res_log2 = evaluate("log2(16)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_log2.result, 4.0);
+        let res_odd_root = evaluate("root(-27, 3)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_odd_root.result, -3.0);
+        let res_pow_fn = evaluate("pow(3, 4)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_pow_fn.result, 81.0);
+
+        // Hyperbolic functions and inverses
+        let res_sinh = evaluate("sinh(0)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_sinh.result, 0.0);
+        let res_cosh = evaluate("cosh(0)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_cosh.result, 1.0);
+        let res_tanh = evaluate("tanh(0)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_tanh.result, 0.0);
+        let res_asinh = evaluate("asinh(0)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_asinh.result, 0.0);
+        let res_acosh = evaluate("acosh(1)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_acosh.result, 0.0);
+        let res_atanh = evaluate("atanh(0)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_atanh.result, 0.0);
+
+        // Inverse trig: acos, atan, atan2
+        let res_acos = evaluate("acos(1)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_acos.result, 0.0);
+        let res_atan = evaluate("atan(1)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_atan.result, 45.0);
+        let res_atan2 = evaluate("atan2(1, 1)", AngleUnit::Deg).unwrap();
+        assert_eq!(res_atan2.result, 45.0);
+        let res_atan2_rad = evaluate("atan2(1, 1)", AngleUnit::Rad).unwrap();
+        assert!((res_atan2_rad.result - PI / 4.0).abs() < 1e-10);
+
+        // Modulo binary operation
+        let res_mod = evaluate("14 % 5", AngleUnit::Deg).unwrap();
+        assert_eq!(res_mod.result, 4.0);
+
+        // Trig deg edge cases: sin(0), sin(180), sin(270), cos(90), cos(180), cos(270)
+        assert_eq!(evaluate("sin(0)", AngleUnit::Deg).unwrap().result, 0.0);
+        assert_eq!(evaluate("sin(180)", AngleUnit::Deg).unwrap().result, 0.0);
+        assert_eq!(evaluate("sin(270)", AngleUnit::Deg).unwrap().result, -1.0);
+        assert_eq!(evaluate("cos(90)", AngleUnit::Deg).unwrap().result, 0.0);
+        assert_eq!(evaluate("cos(180)", AngleUnit::Deg).unwrap().result, -1.0);
+        assert_eq!(evaluate("cos(270)", AngleUnit::Deg).unwrap().result, 0.0);
+        assert_eq!(evaluate("tan(0)", AngleUnit::Deg).unwrap().result, 0.0);
+        assert_eq!(evaluate("tan(180)", AngleUnit::Deg).unwrap().result, 0.0);
+        assert!((evaluate("tan(225)", AngleUnit::Deg).unwrap().result - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_format_calculation_result_edge_cases() {
+        assert_eq!(format_calculation_result(f64::NAN), "NaN");
+        assert_eq!(format_calculation_result(f64::INFINITY), "Infinity");
+        assert_eq!(format_calculation_result(f64::NEG_INFINITY), "-Infinity");
+        assert_eq!(format_calculation_result(0.0), "0");
+        assert_eq!(format_calculation_result(1e-16), "0");
+        assert!(format_calculation_result(1e15).contains('e'));
+        assert!(format_calculation_result(1e-8).contains('e'));
+        assert_eq!(format_calculation_result(42.5), "42.5");
+        assert_eq!(format_calculation_result(100.0), "100");
+    }
+
+    #[test]
+    fn test_execute_operation_exhaustive() {
+        // Single ops in Deg and Rad
+        assert_eq!(execute_operation("sin", 90.0, None, AngleUnit::Deg).unwrap(), 1.0);
+        assert_eq!(execute_operation("sin", 0.0, None, AngleUnit::Deg).unwrap(), 0.0);
+        assert_eq!(execute_operation("cos", 0.0, None, AngleUnit::Deg).unwrap(), 1.0);
+        assert_eq!(execute_operation("cos", 90.0, None, AngleUnit::Deg).unwrap(), 0.0);
+        assert_eq!(execute_operation("tan", 45.0, None, AngleUnit::Deg).unwrap().round(), 1.0);
+        assert!(execute_operation("tan", 90.0, None, AngleUnit::Deg).is_err());
+
+        assert_eq!(execute_operation("asin", 1.0, None, AngleUnit::Deg).unwrap(), 90.0);
+        assert!(execute_operation("asin", 2.0, None, AngleUnit::Deg).is_err());
+        assert_eq!(execute_operation("acos", 1.0, None, AngleUnit::Deg).unwrap(), 0.0);
+        assert!(execute_operation("acos", 2.0, None, AngleUnit::Deg).is_err());
+        assert_eq!(execute_operation("atan", 1.0, None, AngleUnit::Deg).unwrap(), 45.0);
+
+        assert_eq!(execute_operation("sinh", 0.0, None, AngleUnit::Deg).unwrap(), 0.0);
+        assert_eq!(execute_operation("cosh", 0.0, None, AngleUnit::Deg).unwrap(), 1.0);
+        assert_eq!(execute_operation("tanh", 0.0, None, AngleUnit::Deg).unwrap(), 0.0);
+        assert_eq!(execute_operation("asinh", 0.0, None, AngleUnit::Deg).unwrap(), 0.0);
+        assert_eq!(execute_operation("acosh", 1.0, None, AngleUnit::Deg).unwrap(), 0.0);
+        assert!(execute_operation("acosh", 0.5, None, AngleUnit::Deg).is_err());
+        assert_eq!(execute_operation("atanh", 0.0, None, AngleUnit::Deg).unwrap(), 0.0);
+        assert!(execute_operation("atanh", 1.0, None, AngleUnit::Deg).is_err());
+
+        assert_eq!(execute_operation("sqrt", 25.0, None, AngleUnit::Deg).unwrap(), 5.0);
+        assert!(execute_operation("sqrt", -4.0, None, AngleUnit::Deg).is_err());
+        assert_eq!(execute_operation("cbrt", -8.0, None, AngleUnit::Deg).unwrap(), -2.0);
+        assert_eq!(execute_operation("square", 4.0, None, AngleUnit::Deg).unwrap(), 16.0);
+        assert_eq!(execute_operation("cube", 3.0, None, AngleUnit::Deg).unwrap(), 27.0);
+        assert_eq!(execute_operation("recip", 4.0, None, AngleUnit::Deg).unwrap(), 0.25);
+        assert!(execute_operation("recip", 0.0, None, AngleUnit::Deg).is_err());
+
+        assert_eq!(execute_operation("ln", E, None, AngleUnit::Deg).unwrap(), 1.0);
+        assert!(execute_operation("ln", 0.0, None, AngleUnit::Deg).is_err());
+        assert_eq!(execute_operation("log10", 100.0, None, AngleUnit::Deg).unwrap(), 2.0);
+        assert!(execute_operation("log10", -10.0, None, AngleUnit::Deg).is_err());
+        assert_eq!(execute_operation("log2", 8.0, None, AngleUnit::Deg).unwrap(), 3.0);
+        assert!(execute_operation("log2", 0.0, None, AngleUnit::Deg).is_err());
+
+        assert!((execute_operation("exp", 1.0, None, AngleUnit::Deg).unwrap() - E).abs() < 1e-12);
+        assert_eq!(execute_operation("pow10", 3.0, None, AngleUnit::Deg).unwrap(), 1000.0);
+        assert_eq!(execute_operation("pow2", 4.0, None, AngleUnit::Deg).unwrap(), 16.0);
+        assert_eq!(execute_operation("factorial", 5.0, None, AngleUnit::Deg).unwrap(), 120.0);
+        assert_eq!(execute_operation("abs", -7.0, None, AngleUnit::Deg).unwrap(), 7.0);
+        assert_eq!(execute_operation("neg", 12.0, None, AngleUnit::Deg).unwrap(), -12.0);
+        assert_eq!(execute_operation("percent", 80.0, None, AngleUnit::Deg).unwrap(), 0.8);
+
+        // Binary operations
+        assert_eq!(execute_operation("power", 2.0, Some(5.0), AngleUnit::Deg).unwrap(), 32.0);
+        assert!(execute_operation("power", 2.0, None, AngleUnit::Deg).is_err());
+        assert!(execute_operation("power", -2.0, Some(0.5), AngleUnit::Deg).is_err());
+
+        assert_eq!(execute_operation("root", 81.0, Some(4.0), AngleUnit::Deg).unwrap(), 3.0);
+        assert_eq!(execute_operation("root", -8.0, Some(3.0), AngleUnit::Deg).unwrap(), -2.0);
+        assert!(execute_operation("root", 81.0, None, AngleUnit::Deg).is_err());
+        assert!(execute_operation("root", 81.0, Some(0.0), AngleUnit::Deg).is_err());
+        assert!(execute_operation("root", -16.0, Some(2.0), AngleUnit::Deg).is_err());
+
+        // Unsupported
+        assert!(execute_operation("invalid_op", 1.0, None, AngleUnit::Deg).is_err());
+    }
+
+    #[test]
+    fn test_tauri_command_handlers() {
+        let res = calculate_expression("3 + 7".to_string(), "deg".to_string()).unwrap();
+        assert_eq!(res.result, 10.0);
+        assert_eq!(res.formatted, "10");
+
+        let res_rad = calculate_expression("sin(pi / 2)".to_string(), "radians".to_string()).unwrap();
+        assert!((res_rad.result - 1.0).abs() < 1e-12);
+
+        let res_op = calculate_scientific_op("sqrt".to_string(), 64.0, None, "deg".to_string()).unwrap();
+        assert_eq!(res_op, 8.0);
+
+        let res_op_bin = calculate_scientific_op("pow".to_string(), 2.0, Some(4.0), "rad".to_string()).unwrap();
+        assert_eq!(res_op_bin, 16.0);
+
+        assert_eq!(AngleUnit::from_str_opt("deg"), AngleUnit::Deg);
+        assert_eq!(AngleUnit::from_str_opt("rad"), AngleUnit::Rad);
+        assert_eq!(AngleUnit::from_str_opt("radians"), AngleUnit::Rad);
+        assert_eq!(AngleUnit::from_str_opt("degrees"), AngleUnit::Deg);
     }
 }
