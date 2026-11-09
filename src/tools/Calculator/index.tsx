@@ -30,15 +30,23 @@ export const Calculator: React.FC = () => {
     if (error) setError(null);
   };
 
-  // Perform calculation
+  // Perform full calculation (= or Enter)
   const handleCalculate = useCallback(async () => {
-    const exprToEvaluate = expression.trim() || displayValue;
+    let exprToEvaluate = expression.trim() || displayValue.trim();
     if (!exprToEvaluate || exprToEvaluate === "0") return;
+
+    // Auto-close missing unclosed parentheses
+    const openParens = (exprToEvaluate.match(/\(/g) || []).length;
+    const closeParens = (exprToEvaluate.match(/\)/g) || []).length;
+    if (openParens > closeParens) {
+      exprToEvaluate += ")".repeat(openParens - closeParens);
+    }
 
     try {
       clearError();
       const res = await evaluateCalculatorExpression(exprToEvaluate, angleUnit);
       setDisplayValue(res.formatted);
+      setExpression(res.formatted);
       setPreviousExpr(`${exprToEvaluate} =`);
       setJustEvaluated(true);
 
@@ -58,18 +66,153 @@ export const Calculator: React.FC = () => {
     }
   }, [expression, displayValue, angleUnit]);
 
-  // Append character or function token
-  const handleAppend = (token: string, isFunction = false) => {
-    clearError();
-    if (justEvaluated) {
-      // If user presses an operator after calculation, continue with the result
-      if (["+", "-", "×", "÷", "*", "/", "^", "%"].includes(token)) {
-        setExpression(displayValue + " " + token + " ");
-        setDisplayValue(displayValue);
+  // Apply unary functions (e.g. sqrt, sin, cos, sqr, cube, inv, fact, ln, log, abs)
+  // If user has a current answer or standalone number (like 4 from 2+2), applying sqrt computes sqrt(4) = 2 immediately!
+  const applyUnaryFunction = useCallback(
+    async (funcName: string) => {
+      clearError();
+
+      const getWrappedExpr = (fn: string, val: string): string => {
+        switch (fn) {
+          case "sqr":
+          case "^2":
+            return `(${val})^2`;
+          case "cube":
+          case "^3":
+            return `(${val})^3`;
+          case "inv":
+          case "1/x":
+            return `inv(${val})`;
+          case "fact":
+          case "x!":
+            return `fact(${val})`;
+          case "pow10":
+          case "10^":
+            return `10^(${val})`;
+          case "pow2":
+          case "2^":
+            return `2^(${val})`;
+          case "percent":
+          case "%":
+            return `(${val})%`;
+          default:
+            return `${fn}(${val})`;
+        }
+      };
+
+      // Check if we have an answer or standalone number on screen
+      const isStandaloneNumber =
+        !isNaN(Number(expression.trim())) && expression.trim() !== "";
+
+      if (justEvaluated || isStandaloneNumber) {
+        const targetVal = displayValue.trim() || expression.trim() || "0";
+        const exprToEval = getWrappedExpr(funcName, targetVal);
+
+        try {
+          const res = await evaluateCalculatorExpression(exprToEval, angleUnit);
+          setDisplayValue(res.formatted);
+          setExpression(res.formatted);
+          setPreviousExpr(`${exprToEval} =`);
+          setJustEvaluated(true);
+
+          const historyItem: CalculationHistoryItem = {
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            expression: exprToEval,
+            result: res.formatted,
+            numericResult: res.result,
+            timestamp: new Date(),
+            angleUnit,
+          };
+          setHistory((prev) => [historyItem, ...prev]);
+        } catch (err: unknown) {
+          const errMsg =
+            typeof err === "string" ? err : (err as Error)?.message || "Calculation error";
+          setError(errMsg);
+        }
+        return;
+      }
+
+      // If user is currently typing a formula
+      const trimmed = expression.trim();
+
+      // If empty or "0", start function or evaluate directly for postfix
+      if (!trimmed || trimmed === "0") {
+        if (["sqr", "^2", "cube", "^3", "inv", "fact", "percent", "%"].includes(funcName)) {
+          const exprToEval = getWrappedExpr(funcName, "0");
+          try {
+            const res = await evaluateCalculatorExpression(exprToEval, angleUnit);
+            setDisplayValue(res.formatted);
+            setExpression(res.formatted);
+            setPreviousExpr(`${exprToEval} =`);
+            setJustEvaluated(true);
+          } catch (err: unknown) {
+            setError(typeof err === "string" ? err : "Error");
+          }
+        } else {
+          const prefix =
+            funcName === "pow10"
+              ? "10^("
+              : funcName === "pow2"
+              ? "2^("
+              : `${funcName}(`;
+          setExpression(prefix);
+          setDisplayValue(prefix);
+          setJustEvaluated(false);
+        }
+        return;
+      }
+
+      // If expression ends with an operator (e.g. "10 + " or "(")
+      if (/[+\-×÷*/^(\s]$/.test(expression)) {
+        const prefix =
+          funcName === "pow10"
+            ? "10^("
+            : funcName === "pow2"
+            ? "2^("
+            : `${funcName}(`;
+        setExpression((prev) => prev + prefix);
+        setDisplayValue((prev) => prev + prefix);
         setJustEvaluated(false);
         return;
       }
-      // If user enters a number or function, start fresh
+
+      // If expression ends with a trailing number (e.g. "10 + 16")
+      const match = expression.match(/(\d+(?:\.\d+)?)$/);
+      if (match) {
+        const lastNum = match[1];
+        const prefix = expression.slice(0, -lastNum.length);
+        const wrapped = getWrappedExpr(funcName, lastNum);
+        const newExpr = prefix + wrapped;
+        setExpression(newExpr);
+        setDisplayValue(newExpr);
+        setJustEvaluated(false);
+        return;
+      }
+
+      // Fallback
+      const prefix =
+        funcName === "pow10"
+          ? "10^("
+          : funcName === "pow2"
+          ? "2^("
+          : `${funcName}(`;
+      setExpression((prev) => prev + prefix);
+      setDisplayValue((prev) => prev + prefix);
+      setJustEvaluated(false);
+    },
+    [expression, displayValue, justEvaluated, angleUnit]
+  );
+
+  // Append token (parentheses, constants)
+  const handleAppend = (token: string, isFunction = false) => {
+    clearError();
+    if (justEvaluated) {
+      if (["+", "-", "×", "÷", "*", "/", "^", "%"].includes(token)) {
+        setExpression(displayValue + " " + token + " ");
+        setDisplayValue(displayValue + " " + token + " ");
+        setJustEvaluated(false);
+        return;
+      }
       if (isFunction) {
         setExpression(token + "(");
         setDisplayValue(token + "(");
@@ -85,7 +228,7 @@ export const Calculator: React.FC = () => {
       setExpression((prev) => prev + token + "(");
       setDisplayValue((prev) => (prev === "0" ? token + "(" : prev + token + "("));
     } else {
-      setExpression((prev) => prev + token);
+      setExpression((prev) => (prev === "0" && token !== "." ? token : prev + token));
       setDisplayValue((prev) => (prev === "0" && token !== "." ? token : prev + token));
     }
   };
@@ -109,20 +252,52 @@ export const Calculator: React.FC = () => {
     }
   };
 
-  // Operator input
+  // Decimal point input with duplicate dot validation
+  const handleDecimal = () => {
+    clearError();
+    if (justEvaluated) {
+      setExpression("0.");
+      setDisplayValue("0.");
+      setJustEvaluated(false);
+      return;
+    }
+
+    // Check if the current trailing number segment already contains a decimal point
+    const match = expression.match(/(\d*\.?\d*)$/);
+    if (match && match[1].includes(".")) {
+      return; // Ignore duplicate decimal point in same number
+    }
+
+    if (!expression || expression === "0" || /[+\-×÷*/^(\s]$/.test(expression)) {
+      setExpression((prev) => (prev === "0" ? "0." : prev + "0."));
+      setDisplayValue((prev) => (prev === "0" ? "0." : prev + "0."));
+    } else {
+      setExpression((prev) => prev + ".");
+      setDisplayValue((prev) => prev + ".");
+    }
+  };
+
+  // Operator input (+, -, *, /, ^) with consecutive operator replacement
   const handleOperator = (op: string) => {
     clearError();
     const formattedOp = ` ${op} `;
     if (justEvaluated) {
       setExpression(displayValue + formattedOp);
+      setDisplayValue(displayValue + formattedOp);
       setJustEvaluated(false);
       return;
     }
 
-    if (!expression) {
+    if (!expression || expression === "0") {
       setExpression(displayValue + formattedOp);
+      setDisplayValue(displayValue + formattedOp);
+    } else if (/\s[+\-×÷*/^]\s$/.test(expression)) {
+      // Replace trailing operator if user pressed another operator
+      setExpression((prev) => prev.replace(/\s[+\-×÷*/^]\s$/, formattedOp));
+      setDisplayValue((prev) => prev.replace(/\s[+\-×÷*/^]\s$/, formattedOp));
     } else {
       setExpression((prev) => prev + formattedOp);
+      setDisplayValue((prev) => prev + formattedOp);
     }
   };
 
@@ -165,16 +340,16 @@ export const Calculator: React.FC = () => {
   // Negate current number (±)
   const handleNegate = () => {
     clearError();
-    if (justEvaluated) {
-      if (displayValue.startsWith("-")) {
-        const positive = displayValue.slice(1);
-        setDisplayValue(positive);
-        setExpression(positive);
+    if (justEvaluated || (!isNaN(Number(expression.trim())) && expression.trim() !== "")) {
+      const val = displayValue.trim() || expression.trim();
+      let next: string;
+      if (val.startsWith("-")) {
+        next = val.slice(1);
       } else {
-        const negative = `-${displayValue}`;
-        setDisplayValue(negative);
-        setExpression(negative);
+        next = `-${val}`;
       }
+      setDisplayValue(next);
+      setExpression(next);
       return;
     }
 
@@ -194,7 +369,7 @@ export const Calculator: React.FC = () => {
   // Percentage
   const handlePercentage = () => {
     clearError();
-    handleAppend("%");
+    applyUnaryFunction("percent");
   };
 
   // Memory Functions
@@ -252,7 +427,7 @@ export const Calculator: React.FC = () => {
         handleNumber(key);
       } else if (key === ".") {
         e.preventDefault();
-        handleAppend(".");
+        handleDecimal();
       } else if (key === "+" || key === "-") {
         e.preventDefault();
         handleOperator(key);
@@ -273,7 +448,19 @@ export const Calculator: React.FC = () => {
         handleAppend(key);
       } else if (key === "!" && mode === "scientific") {
         e.preventDefault();
-        handleAppend("!");
+        applyUnaryFunction("fact");
+      } else if ((key === "r" || key === "R") && mode === "scientific") {
+        e.preventDefault();
+        applyUnaryFunction("sqrt");
+      } else if ((key === "s" || key === "S") && mode === "scientific") {
+        e.preventDefault();
+        applyUnaryFunction("sin");
+      } else if ((key === "c" || key === "C") && mode === "scientific") {
+        e.preventDefault();
+        applyUnaryFunction("cos");
+      } else if ((key === "t" || key === "T") && mode === "scientific") {
+        e.preventDefault();
+        applyUnaryFunction("tan");
       } else if (key === "Enter" || key === "=") {
         e.preventDefault();
         handleCalculate();
@@ -288,7 +475,18 @@ export const Calculator: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleCalculate, justEvaluated, displayValue, expression, mode]);
+  }, [
+    handleCalculate,
+    handleNumber,
+    handleDecimal,
+    handleOperator,
+    handlePercentage,
+    handleAppend,
+    applyUnaryFunction,
+    handleBackspace,
+    handleAllClear,
+    mode,
+  ]);
 
   // Adjust display font size based on string length
   const getDisplayClass = () => {
@@ -536,7 +734,7 @@ export const Calculator: React.FC = () => {
               </button>
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => handleAppend("fact", true)}
+                onClick={() => applyUnaryFunction("fact")}
                 title="Factorial x!"
                 type="button"
               >
@@ -548,9 +746,9 @@ export const Calculator: React.FC = () => {
                 className="calc-btn btn-scientific"
                 onClick={() => {
                   if (isHyperbolic) {
-                    handleAppend(isSecondFunction ? "asinh" : "sinh", true);
+                    applyUnaryFunction(isSecondFunction ? "asinh" : "sinh");
                   } else {
-                    handleAppend(isSecondFunction ? "asin" : "sin", true);
+                    applyUnaryFunction(isSecondFunction ? "asin" : "sin");
                   }
                 }}
                 type="button"
@@ -567,9 +765,9 @@ export const Calculator: React.FC = () => {
                 className="calc-btn btn-scientific"
                 onClick={() => {
                   if (isHyperbolic) {
-                    handleAppend(isSecondFunction ? "acosh" : "cosh", true);
+                    applyUnaryFunction(isSecondFunction ? "acosh" : "cosh");
                   } else {
-                    handleAppend(isSecondFunction ? "acos" : "cos", true);
+                    applyUnaryFunction(isSecondFunction ? "acos" : "cos");
                   }
                 }}
                 type="button"
@@ -586,9 +784,9 @@ export const Calculator: React.FC = () => {
                 className="calc-btn btn-scientific"
                 onClick={() => {
                   if (isHyperbolic) {
-                    handleAppend(isSecondFunction ? "atanh" : "tanh", true);
+                    applyUnaryFunction(isSecondFunction ? "atanh" : "tanh");
                   } else {
-                    handleAppend(isSecondFunction ? "atan" : "tan", true);
+                    applyUnaryFunction(isSecondFunction ? "atan" : "tan");
                   }
                 }}
                 type="button"
@@ -603,7 +801,7 @@ export const Calculator: React.FC = () => {
               </button>
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => handleAppend("inv", true)}
+                onClick={() => applyUnaryFunction("inv")}
                 title="Reciprocal 1/x"
                 type="button"
               >
@@ -613,13 +811,7 @@ export const Calculator: React.FC = () => {
               {/* Row 3: Logarithms & Exponentials */}
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => {
-                  if (isSecondFunction) {
-                    handleAppend("exp", true);
-                  } else {
-                    handleAppend("ln", true);
-                  }
-                }}
+                onClick={() => applyUnaryFunction(isSecondFunction ? "exp" : "ln")}
                 type="button"
               >
                 {isSecondFunction ? (
@@ -632,13 +824,7 @@ export const Calculator: React.FC = () => {
               </button>
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => {
-                  if (isSecondFunction) {
-                    handleAppend("10^");
-                  } else {
-                    handleAppend("log10", true);
-                  }
-                }}
+                onClick={() => applyUnaryFunction(isSecondFunction ? "pow10" : "log10")}
                 type="button"
               >
                 {isSecondFunction ? (
@@ -651,13 +837,7 @@ export const Calculator: React.FC = () => {
               </button>
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => {
-                  if (isSecondFunction) {
-                    handleAppend("2^");
-                  } else {
-                    handleAppend("log2", true);
-                  }
-                }}
+                onClick={() => applyUnaryFunction(isSecondFunction ? "pow2" : "log2")}
                 type="button"
               >
                 {isSecondFunction ? (
@@ -672,7 +852,7 @@ export const Calculator: React.FC = () => {
               </button>
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => handleAppend("abs", true)}
+                onClick={() => applyUnaryFunction("abs")}
                 title="Absolute value |x|"
                 type="button"
               >
@@ -682,26 +862,14 @@ export const Calculator: React.FC = () => {
               {/* Row 4: Powers & Roots */}
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => {
-                  if (isSecondFunction) {
-                    handleAppend("sqrt", true);
-                  } else {
-                    handleAppend("^2");
-                  }
-                }}
+                onClick={() => (isSecondFunction ? applyUnaryFunction("sqrt") : applyUnaryFunction("sqr"))}
                 type="button"
               >
                 {isSecondFunction ? "√x" : <span>x<sup>2</sup></span>}
               </button>
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => {
-                  if (isSecondFunction) {
-                    handleAppend("cbrt", true);
-                  } else {
-                    handleAppend("^3");
-                  }
-                }}
+                onClick={() => (isSecondFunction ? applyUnaryFunction("cbrt") : applyUnaryFunction("cube"))}
                 type="button"
               >
                 {isSecondFunction ? "∛x" : <span>x<sup>3</sup></span>}
@@ -712,7 +880,7 @@ export const Calculator: React.FC = () => {
                   if (isSecondFunction) {
                     handleAppend("root", true);
                   } else {
-                    handleAppend("^");
+                    handleOperator("^");
                   }
                 }}
                 type="button"
@@ -721,7 +889,7 @@ export const Calculator: React.FC = () => {
               </button>
               <button
                 className="calc-btn btn-scientific"
-                onClick={() => handleAppend("sqrt", true)}
+                onClick={() => applyUnaryFunction("sqrt")}
                 type="button"
               >
                 √
@@ -900,7 +1068,7 @@ export const Calculator: React.FC = () => {
             </button>
             <button
               className="calc-btn btn-number"
-              onClick={() => handleAppend(".")}
+              onClick={handleDecimal}
               type="button"
             >
               .
